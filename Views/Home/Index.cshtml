@@ -1,0 +1,190 @@
+﻿@model IEnumerable<AmazonReviews.DTO.ReviewDTO>
+@{
+    ViewData["Title"] = "Review Generator";
+}
+
+<div id="review-container">
+    <h1>Amazon Reviews</h1>
+    <p>Click the button below to generate a review.</p>
+    <button id="generate-review">Generate Review</button>
+    <p></p>
+    <div id="review-output"></div>
+</div>
+
+<!-- Modal for high-resolution image -->
+<div id="image-modal">
+    <div id="modal-content">
+        <img id="modal-image" src="" alt="High Res Image" />
+        <div id="magnifier"></div>
+    </div>
+    <button id="close-modal">Close</button>
+</div>
+
+<script>
+    document.getElementById("generate-review").addEventListener("click", async () => {
+        const response = await fetch('/api/generate/generate');
+        if (response.ok) {
+            const review = await response.json();
+
+            let lowResImages = review.productImage || [];
+            let highResImages = review.productHiRes || [];
+
+            let imageGalleryHTML = "";
+
+            if (lowResImages.length > 0) {
+
+                imageGalleryHTML += `<p><strong>Product Image Gallery:</strong></p>
+                                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">`;
+
+                lowResImages.forEach((lowResImage, index) => {
+                    let highResImage = highResImages[index] || "";
+                    imageGalleryHTML += `
+                    <img src="${lowResImage}"
+                         alt="Product Image"
+                         style="max-width: 150px; height: auto; border: 1px solid #ddd; padding: 5px; cursor: pointer;"
+                         onclick="openModal('${highResImage}')"
+                    />
+                `;
+                });
+
+                imageGalleryHTML += `</div><p/>`;
+            }
+
+            const fullStar = "&#9733;"; // Unicode for filled star
+            const emptyStar = "&#9734;"; // Unicode for empty star
+            let starHTML = "";
+            for (let i = 1; i <= 5; i++) {
+                starHTML += i <= review.starRating ? fullStar : emptyStar;
+            }
+
+            document.getElementById("review-output").innerHTML = `
+                <p><strong>Product Name:</strong> ${review.productName}</p>
+                <p><strong>Star Rating:</strong> <span style="color: gold;">${starHTML}</span> ${review.starRating}/5</p>                                
+                ${imageGalleryHTML}                
+                <p><strong>Reviewer:</strong> ${review.reviewerName}</p>
+                <p><strong>Review Text:</strong> ${review.reviewText}</p>                
+            `;
+        } else {
+            document.getElementById("review-output").innerText = "Error generating review.";
+        }
+    });
+
+    function openModal(highResImage) {
+        const modal = document.getElementById('image-modal');
+        const modalImage = document.getElementById('modal-image');
+        const magnifier = document.getElementById('magnifier');
+        const modalContent = document.getElementById('modal-content');
+
+        modal.style.display = 'flex';
+        modalImage.src = highResImage;
+
+        modalImage.onload = function () {
+            const zoomLevel = 2;
+            magnifier.style.backgroundImage = `url(${highResImage})`;
+            magnifier.style.backgroundSize = `${modalImage.offsetWidth * zoomLevel}px ${modalImage.offsetHeight * zoomLevel}px`;
+
+            modalContent.style.backgroundImage = `
+            linear-gradient(
+                rgba(255, 255, 255, 0.875), 
+                rgba(255, 255, 255, 0.875)
+            ), 
+            url(${highResImage})
+        `;
+
+            modalContent.style.width = `${modalImage.offsetWidth * 1.5}px`;
+            modalContent.style.height = `${modalImage.offsetHeight * 1.5}px`;
+            modalContent.style.justifyContent = 'center';
+            modalContent.style.alignItems = 'center';
+
+            modalContent.addEventListener('mousemove', function (e) {
+                const rect = modalImage.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const magnifierSize = 150;
+                const left = x - magnifierSize / 2 + 40;
+                const top = y - magnifierSize / 2 + 40;
+
+                magnifier.style.display = 'block';
+                magnifier.style.left = `${left}px`;
+                magnifier.style.top = `${top}px`;
+
+                const bgX = (x / modalImage.offsetWidth) * 100;
+                const bgY = (y / modalImage.offsetHeight) * 100;
+
+                magnifier.style.backgroundPosition = `${bgX}% ${bgY}%`;
+            });
+
+            modalContent.addEventListener('mouseleave', function () {
+                magnifier.style.display = 'none';
+            });
+        };
+    }
+
+    document.getElementById('close-modal').addEventListener('click', function () {
+        const modal = document.getElementById('image-modal');
+        modal.style.display = 'none';
+
+        const modalContent = document.getElementById('modal-content');
+        const clone = modalContent.cloneNode(true);
+        modalContent.parentNode.replaceChild(clone, modalContent);
+    });
+</script>
+
+<style>
+    #image-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #modal-content {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 10px;
+        background-size: cover; /* Ensure the gradient and image fit the content */
+        background-repeat: no-repeat;
+        background-position: center; /* Center the gradient image */
+        border: 20px solid #fff; /* Border to surround the image */
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Optional shadow for better visuals */
+    }
+
+    #modal-image {
+        max-width: 100%;
+        max-height: 100%;
+        display: block;
+    }
+
+    #magnifier {
+        position: absolute;
+        border: 2px solid #ddd;
+        border-radius: 50%;
+        width: 150px;
+        height: 150px;
+        pointer-events: none;
+        display: none;
+        background-repeat: no-repeat;
+    }
+
+    #close-modal {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background-color: #ff4d4d;
+        color: #fff;
+        border: none;
+        padding: 10px;
+        cursor: pointer;
+        border-radius: 5px;
+        font-size: 14px;
+    }
+</style>
